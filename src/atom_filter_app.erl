@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @doc Atom feed search agent.
+%%% Atom feed search agent.
 %%%
 %%% Reads a list of Atom feed URLs from atom_config.json, fetches each
 %%% feed, and returns entries whose title, link or summary matches
@@ -19,7 +19,6 @@
 %%%
 %%% Handler contract: handle/2 (Body, Memory) -> {RawList, NewMemory}.
 %%% Memory schema: #{seen => #{binary_url => true}}.
-%%% @end
 %%%-------------------------------------------------------------------
 -module(atom_filter_app).
 -behaviour(application).
