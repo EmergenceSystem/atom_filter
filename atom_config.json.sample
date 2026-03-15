@@ -1,0 +1,6 @@
+{
+    "atom_feeds": [
+        "https://example.com/feed.atom",
+        "https://another.com/feed.xml"
+    ]
+}
