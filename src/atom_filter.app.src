@@ -1,6 +1,6 @@
 {application, atom_filter, [
     {description, "em_filter lib to handle Atom feeds"},
-    {vsn, "0.1.0"},
+    {vsn, "0.2.0"},
     {registered, []},
     {mod, {atom_filter_app, []}},
     {applications, [

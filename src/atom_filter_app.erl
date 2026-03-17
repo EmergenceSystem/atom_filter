@@ -1,24 +1,22 @@
 %%%-------------------------------------------------------------------
-%%% Atom feed search agent.
+%%% @doc Atom feed search agent.
 %%%
 %%% Reads a list of Atom feed URLs from atom_config.json, fetches each
 %%% feed, and returns entries whose title, link or summary matches
 %%% the search query.
 %%%
-%%% Maintains a memory of URLs already returned so duplicate entries
-%%% across successive queries are filtered out.
+%%% Deduplication by URL is handled upstream by the Emquest pipeline.
+%%%
+%%% === Capability cascade ===
+%%%
+%%%   base_capabilities/0 extends em_filter:base_capabilities().
+%%%   Site-specific filters extend atom_filter_app:base_capabilities():
 %%%
 %%% atom_config.json format:
 %%%   { "atom_feeds": ["https://example.com/feed.atom", ...] }
 %%%
-%%% Key differences from RSS:
-%%%   - Root element is <feed> instead of <rss>
-%%%   - Items are <entry> instead of <item>
-%%%   - Link is <link href="..."/> (attribute) instead of <link>url</link>
-%%%   - Summary is <summary> or <content> instead of <description>
-%%%
-%%% Handler contract: handle/2 (Body, Memory) -> {RawList, NewMemory}.
-%%% Memory schema: #{seen => #{binary_url => true}}.
+%%% Handler contract: handle/2 (Body, Memory) -> {RawList, Memory}.
+%%% @end
 %%%-------------------------------------------------------------------
 -module(atom_filter_app).
 -behaviour(application).
@@ -26,13 +24,15 @@
 -include_lib("xmerl/include/xmerl.hrl").
 
 -export([start/2, stop/1]).
--export([handle/2]).
+-export([handle/2, base_capabilities/0]).
 
--define(CAPABILITIES, [
-    <<"atom">>,
-    <<"feeds">>,
-    <<"news">>
-]).
+%%====================================================================
+%% Capability cascade
+%%====================================================================
+
+-spec base_capabilities() -> [binary()].
+base_capabilities() ->
+    em_filter:base_capabilities() ++ [<<"atom">>, <<"feeds">>, <<"news">>].
 
 %%====================================================================
 %% Application behaviour
@@ -40,8 +40,7 @@
 
 start(_StartType, _StartArgs) ->
     em_filter:start_agent(atom_filter, ?MODULE, #{
-        capabilities => ?CAPABILITIES,
-        memory       => ets
+        capabilities => base_capabilities()
     }).
 
 stop(_State) ->
@@ -52,14 +51,7 @@ stop(_State) ->
 %%====================================================================
 
 handle(Body, Memory) when is_binary(Body) ->
-    Seen    = maps:get(seen, Memory, #{}),
-    Embryos = generate_embryo_list(Body),
-    Fresh   = [E || E <- Embryos, not maps:is_key(url_of(E), Seen)],
-    NewSeen = lists:foldl(fun(E, Acc) ->
-        Acc#{url_of(E) => true}
-    end, Seen, Fresh),
-    {Fresh, Memory#{seen => NewSeen}};
-
+    {generate_embryo_list(Body), Memory};
 handle(_Body, Memory) ->
     {[], Memory}.
 
@@ -152,16 +144,14 @@ process_entries([Entry | Rest], Query, Start, Timeout, Acc) ->
 
 process_entry(Entry, Query) ->
     Title   = xml_text(xmerl_xpath:string("./title/text()",   Entry)),
-    %% Atom links carry the URL in the href attribute, not as text content.
     Link    = xml_attr(xmerl_xpath:string("./link",            Entry), "href"),
     Summary = xml_text(xmerl_xpath:string("./summary/text()", Entry)),
     Content = xml_text(xmerl_xpath:string("./content/text()", Entry)),
-    %% Use summary when available, fall back to content.
     Body    = case Summary of "" -> Content; _ -> Summary end,
     Matches =
-        string:str(string:lowercase(Title),   Query) > 0 orelse
-        string:str(string:lowercase(Link),    Query) > 0 orelse
-        string:str(string:lowercase(Body),    Query) > 0,
+        string:str(string:lowercase(Title), Query) > 0 orelse
+        string:str(string:lowercase(Link),  Query) > 0 orelse
+        string:str(string:lowercase(Body),  Query) > 0,
     case Matches of
         true ->
             {ok, #{
@@ -175,15 +165,9 @@ process_entry(Entry, Query) ->
             skip
     end.
 
-%%--------------------------------------------------------------------
-%% xmerl helpers
-%%--------------------------------------------------------------------
-
-%% Extracts the text content of a node.
 xml_text([#xmlText{value = V} | _]) -> V;
 xml_text(_)                          -> "".
 
-%% Extracts a named attribute value from an element node.
 xml_attr([#xmlElement{attributes = Attrs} | _], Name) ->
     AtomName = list_to_atom(Name),
     case lists:keyfind(AtomName, #xmlAttribute.name, Attrs) of
@@ -191,11 +175,3 @@ xml_attr([#xmlElement{attributes = Attrs} | _], Name) ->
         false                    -> ""
     end;
 xml_attr(_, _) -> "".
-
-%%====================================================================
-%% Internal helpers
-%%====================================================================
-
--spec url_of(map()) -> binary().
-url_of(#{<<"properties">> := #{<<"url">> := Url}}) -> Url;
-url_of(_) -> <<>>.
