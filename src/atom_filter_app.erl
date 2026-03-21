@@ -12,9 +12,6 @@
 %%%   base_capabilities/0 extends em_filter:base_capabilities().
 %%%   Site-specific filters extend atom_filter_app:base_capabilities():
 %%%
-%%%     capabilities => atom_filter_app:base_capabilities()
-%%%                     ++ [<<"linux">>, <<"opensource">>]
-%%%
 %%% atom_config.json format:
 %%%   { "atom_feeds": ["https://example.com/feed.atom", ...] }
 %%%
