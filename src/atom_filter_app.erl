@@ -19,11 +19,9 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(atom_filter_app).
--behaviour(application).
 
 -include_lib("xmerl/include/xmerl.hrl").
 
--export([start/2, stop/1]).
 -export([handle/2, base_capabilities/0]).
 
 %%====================================================================
@@ -33,19 +31,6 @@
 -spec base_capabilities() -> [binary()].
 base_capabilities() ->
     em_filter:base_capabilities() ++ [<<"atom">>, <<"feeds">>, <<"news">>].
-
-%%====================================================================
-%% Application behaviour
-%%====================================================================
-
-start(_StartType, _StartArgs) ->
-    em_filter:start_agent(atom_filter, ?MODULE, #{
-        capabilities => base_capabilities()
-    }),
-    {ok, self()}.
-
-stop(_State) ->
-    em_filter:stop_agent(atom_filter).
 
 %%====================================================================
 %% Agent handler

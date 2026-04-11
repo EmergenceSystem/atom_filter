@@ -1,8 +1,7 @@
 {application, atom_filter, [
     {description, "em_filter lib to handle Atom feeds"},
-    {vsn, "0.2.2"},
+    {vsn, "0.2.3"},
     {registered, []},
-    {mod, {atom_filter_app, []}},
     {applications, [
         kernel,
         stdlib,
